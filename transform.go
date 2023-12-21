@@ -126,7 +126,7 @@ func Merge[T cmp.Ordered](seq1, seq2 Seq[T]) Seq[T] {
 
 // MergeFunc is like [Merge], but uses a custom comparison function
 // for determining the order of values.
-func MergeFunc[T any](seq1, seq2 Seq[T], compare func(T, T) int) Seq[T] {
+func MergeFunc2Pull[T any](seq1, seq2 Seq[T], compare func(T, T) int) Seq[T] {
 	return func(yield func(T) bool) {
 		p1, stop := Pull(seq1)
 		defer stop()
@@ -161,6 +161,68 @@ func MergeFunc[T any](seq1, seq2 Seq[T], compare func(T, T) int) Seq[T] {
 			}
 		}
 
+		return
+	}
+}
+
+// MergeFunc is like [Merge], but uses a custom comparison function
+// for determining the order of values.
+func MergeFunc[T any](seq1, seq2 Seq[T], compare func(T, T) int) Seq[T] {
+	return func(body func(T) bool) {
+		p2, stop := Pull(seq2)
+		defer stop()
+		done := false
+
+		v2, ok2 := p2()
+
+		f := func(v1 T) bool {
+			for ok2 {
+				c := compare(v1, v2)
+				if c < 0 {
+					if !body(v1) {
+						done = true
+						return false
+					}
+					return true // obtain next v1
+				}
+				if c > 0 {
+					if !body(v2) {
+						done = true
+						return false
+					}
+					v2, ok2 = p2()
+					continue
+				}
+				// c == 0
+				if !body(v1) {
+					done = true
+					return false
+				}
+				if !body(v2) {
+					done = true
+					return false
+				}
+				v2, ok2 = p2()
+				return true // obtain next v1
+			}
+			if !body(v1) {
+				done = true
+				return false
+			}
+			return true
+		}
+
+		seq1(f)
+		if done {
+			return
+		}
+
+		// seq1 is exhausted
+		for ; ok2; v2, ok2 = p2() {
+			if !body(v2) {
+				return
+			}
+		}
 		return
 	}
 }

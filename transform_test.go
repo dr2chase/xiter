@@ -98,6 +98,81 @@ func TestMerge(t *testing.T) {
 	}
 }
 
+func TestMergeFuncA(t *testing.T) {
+	s1 := OfSlice([]int{0, 2, 4, 6, 8})
+	s2 := OfSlice([]int{1, 3, 5, 7, 9})
+	seq := MergeFunc(s1, s2, func(x, y int) int { return (x >> 1) - (y >> 1) })
+	r := Collect(seq)
+	if [10]int(r) != [...]int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9} {
+		t.Fatal(r)
+	}
+}
+
+func TestMergeFuncB(t *testing.T) {
+	s1 := OfSlice([]int{1, 3, 5, 7, 9})
+	s2 := OfSlice([]int{0, 2, 4, 6, 8})
+	seq := MergeFunc(s1, s2, func(x, y int) int { return (x >> 1) - (y >> 1) })
+	r := Collect(seq)
+	if [10]int(r) != [...]int{1, 0, 3, 2, 5, 4, 7, 6, 9, 8} {
+		t.Fatal(r)
+	}
+}
+
+func TestMergeFuncC(t *testing.T) {
+	s1 := OfSlice([]int{0, 1, 2, 3, 5})
+	s2 := OfSlice([]int{4, 6, 7, 8, 9})
+	seq := MergeFunc(s1, s2, func(x, y int) int { return (x >> 1) - (y >> 1) })
+	r := Collect(seq)
+	// NB 5 precedes 4 because 5 >>1 == 4 >> 1 and 5 is in s1
+	if [10]int(r) != [...]int{0, 1, 2, 3, 5, 4, 6, 7, 8, 9} {
+		t.Fatal(r)
+	}
+}
+
+func TestMergeFuncD(t *testing.T) {
+	s1 := OfSlice([]int{4, 6, 7, 8, 9})
+	s2 := OfSlice([]int{0, 1, 2, 3, 5})
+	seq := MergeFunc(s1, s2, func(x, y int) int { return (x >> 1) - (y >> 1) })
+	r := Collect(seq)
+	if [10]int(r) != [...]int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9} {
+		t.Fatal(r)
+	}
+}
+
+func TestMergeFuncEarlyA(t *testing.T) {
+	s1 := OfSlice([]int{4, 6, 7, 8, -1, 9})
+	s2 := OfSlice([]int{0, 1, 2, 3, 5})
+	seq := MergeFunc(s1, s2, func(x, y int) int { return (x >> 1) - (y >> 1) })
+	var r []int
+	seq(func(v int) bool {
+		if v < 0 {
+			return false
+		}
+		r = append(r, v)
+		return true
+	})
+	if [9]int(r) != [...]int{0, 1, 2, 3, 4, 5, 6, 7, 8} {
+		t.Fatal(r)
+	}
+}
+
+func TestMergeFuncEarlyB(t *testing.T) {
+	s1 := OfSlice([]int{4, 6, 7, 8, 9})
+	s2 := OfSlice([]int{0, 1, 2, 3, -1, 5})
+	seq := MergeFunc(s1, s2, func(x, y int) int { return (x >> 1) - (y >> 1) })
+	var r []int
+	seq(func(v int) bool {
+		if v < 0 {
+			return false
+		}
+		r = append(r, v)
+		return true
+	})
+	if [4]int(r) != [...]int{0, 1, 2, 3} {
+		t.Fatal(r)
+	}
+}
+
 func splitmerge[T cmp.Ordered](s []T) Seq[T] {
 	if len(s) <= 1 {
 		return OfSlice(s)
@@ -112,11 +187,41 @@ func mergesort[T cmp.Ordered](s []T) {
 	AppendTo(splitmerge(s), s[:0])
 }
 
+func splitmerge2P[T cmp.Ordered](s []T) Seq[T] {
+	if len(s) <= 1 {
+		return OfSlice(s)
+	}
+
+	left := splitmerge(s[:len(s)/2])
+	right := splitmerge(s[len(s)/2:])
+	return MergeFunc2Pull(left, right, cmp.Compare)
+}
+
+func mergesort2P[T cmp.Ordered](s []T) {
+	AppendTo(splitmerge2P(s), s[:0])
+}
+
 func TestMergeSort(t *testing.T) {
 	s := []int{3, 2, 5, 1, 6, 2}
 	mergesort(s)
 	if [6]int(s) != [...]int{1, 2, 2, 3, 5, 6} {
 		t.Fatal(s)
+	}
+}
+
+func BenchmarkMerge1Pull(b *testing.B) {
+	b.ReportAllocs()
+	for range b.N {
+		s := []int{4, 61, 28, 19, 57, 72, 40, 90, 8, 87, 39, 25, 60, 79, 53, 51, 47, 94, 36, 34, 22, 50, 10, 2, 58, 73, 83, 31, 91, 64, 17, 86, 70, 3, 14, 5, 48, 24, 54, 69, 1, 92, 99, 33, 89, 7, 45, 11, 74, 84, 55, 97, 26, 71, 65, 88, 27, 49, 23, 18, 93, 78, 21, 59, 82, 66, 95, 13, 42, 32, 56, 68, 80, 96, 46, 77, 12, 38, 16, 63, 43, 85, 29, 35, 52, 15, 62, 30, 76, 98, 67, 44, 20, 37, 81, 75, 5, 6, 4, 8, 9, 7, 5, 3, 2, 1}
+		mergesort(s)
+	}
+}
+
+func BenchmarkMerge2Pull(b *testing.B) {
+	b.ReportAllocs()
+	for range b.N {
+		s := []int{4, 61, 28, 19, 57, 72, 40, 90, 8, 87, 39, 25, 60, 79, 53, 51, 47, 94, 36, 34, 22, 50, 10, 2, 58, 73, 83, 31, 91, 64, 17, 86, 70, 3, 14, 5, 48, 24, 54, 69, 1, 92, 99, 33, 89, 7, 45, 11, 74, 84, 55, 97, 26, 71, 65, 88, 27, 49, 23, 18, 93, 78, 21, 59, 82, 66, 95, 13, 42, 32, 56, 68, 80, 96, 46, 77, 12, 38, 16, 63, 43, 85, 29, 35, 52, 15, 62, 30, 76, 98, 67, 44, 20, 37, 81, 75, 5, 6, 4, 8, 9, 7, 5, 3, 2, 1}
+		mergesort2P(s)
 	}
 }
 
