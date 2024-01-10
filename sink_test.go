@@ -37,6 +37,29 @@ func TestProduct(t *testing.T) {
 	}
 }
 
+func TestEqual(t *testing.T) {
+	a, b := Of(1, 2, 3), Of(1, 2)
+	e := Of[int]()
+	if Equal(a, b) {
+		t.Fatal("a,b were equal")
+	}
+	if Equal(b, a) {
+		t.Fatal("b,a were equal")
+	}
+	if Equal(a, e) {
+		t.Fatal("a,e were equal")
+	}
+	if Equal(e, a) {
+		t.Fatal("e,a were equal")
+	}
+	if !Equal(e, e) {
+		t.Fatal("e,e were not equal")
+	}
+	if !Equal(a, a) {
+		t.Fatal("a,a were not equal")
+	}
+}
+
 func TestPartition(t *testing.T) {
 	s1, s2 := Partition(Of(1, 2, 3, 4, 5), func(v int) bool { return v%2 == 0 })
 	if !Equal(OfSlice(s1), Of(2, 4)) {

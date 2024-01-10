@@ -129,7 +129,7 @@ func Equal[T cmp.Ordered](seq1, seq2 Seq[T]) bool {
 
 // EqualFunc is like [Equal] but uses a custom comparison function to
 // determine the equivalence of the elements of each sequence.
-func EqualFunc[T1, T2 any](seq1 Seq[T1], seq2 Seq[T2], equal func(T1, T2) bool) bool {
+func EqualFunc1Pull[T1, T2 any](seq1 Seq[T1], seq2 Seq[T2], equal func(T1, T2) bool) bool {
 	p1, stop := Pull(seq1)
 	defer stop()
 	p2, stop := Pull(seq2)
@@ -145,6 +145,28 @@ func EqualFunc[T1, T2 any](seq1 Seq[T1], seq2 Seq[T2], equal func(T1, T2) bool) 
 			return false
 		}
 	}
+}
+
+func EqualFunc[T1, T2 any](seq1 Seq[T1], seq2 Seq[T2], equal func(T1, T2) bool) bool {
+	p2, stop := Pull(seq2)
+	defer stop()
+	result := true
+
+	f := func(x T1) bool {
+		y, ok := p2()
+		if !ok || !equal(x, y) {
+			result = false
+			return false
+		}
+		return true
+	}
+	seq1(f)
+	if !result {
+		return false
+	}
+	_, ok := p2()
+	// equal if p2 is also drained
+	return !ok
 }
 
 // Drain empties seq, discarding every single value and returning once
