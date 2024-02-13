@@ -1,3 +1,3 @@
-module deedles.dev/xiter
+module github.com/dr2chase/xiter
 
 go 1.22
